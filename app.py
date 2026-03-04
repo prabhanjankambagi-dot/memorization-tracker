@@ -1,57 +1,45 @@
-from flask import Flask, request, jsonify, render_template
-from flask_sqlalchemy import SQLAlchemy
-import os
 import streamlit as st
+import sqlite3
+import pandas as pd
 
-# Initialize the Flask application
-app = Flask(__name__)
+st.set_page_config(page_title="Family App")
 
-# Configure the database
-# Using os.path.abspath to ensure the path is correct
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(app.root_path, 'family.db')
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db = SQLAlchemy(app)
+st.title("👨‍👩‍👧 Family Members")
 
-# Define the database model for a Family Member
-class FamilyMember(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
+# -----------------------------
+# Database
+conn = sqlite3.connect("family.db", check_same_thread=False)
 
-    def __repr__(self):
-        return f'<FamilyMember {self.name}>'
+conn.execute("""
+CREATE TABLE IF NOT EXISTS family_member(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT
+)
+""")
 
-# Create the database tables
-#@app.before_first_request
-def create_tables():
-    db.create_all()
+# -----------------------------
+# Add member
+st.header("Add Family Member")
 
-# Route to serve the front-end
-@app.route('/')
-def index():
-    return render_template('index.html')
+name = st.text_input("Enter name")
 
-# API endpoint to add a new family member
-@app.route('/api/add_member', methods=['POST'])
-def add_member():
-    data = request.get_json()
-    new_member_name = data.get('name')
-    if not new_member_name:
-        return jsonify({'error': 'Name is required'}), 400
-    
-    new_member = FamilyMember(name=new_member_name)
-    db.session.add(new_member)
-    db.session.commit()
-    
-    return jsonify({'message': 'Family member added successfully'}), 201
+if st.button("Add Member"):
+    if name:
+        conn.execute(
+            "INSERT INTO family_member (name) VALUES (?)",
+            (name,)
+        )
+        conn.commit()
+        st.success("Member added!")
+    else:
+        st.warning("Enter a name")
 
-# API endpoint to get all family members
-@app.route('/api/get_members', methods=['GET'])
-def get_members():
-    members = FamilyMember.query.all()
-    # Convert list of objects to list of dictionaries
-    members_list = [{'name': member.name} for member in members]
-    return jsonify(members_list)
+# -----------------------------
+# Show members
+st.header("Family Members")
 
-if __name__ == '__main__':
-    app.run(debug=True)
+df = pd.read_sql("SELECT name FROM family_member", conn)
 
+st.dataframe(df)
+
+conn.close()
