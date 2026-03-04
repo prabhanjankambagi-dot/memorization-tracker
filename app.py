@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, render_template
 from flask_sqlalchemy import SQLAlchemy
 import os
+import streamlit as st
 
 # Initialize the Flask application
 app = Flask(__name__)
@@ -20,7 +21,7 @@ class FamilyMember(db.Model):
         return f'<FamilyMember {self.name}>'
 
 # Create the database tables
-@app.before_first_request
+#@app.before_first_request
 def create_tables():
     db.create_all()
 
@@ -53,3 +54,4 @@ def get_members():
 
 if __name__ == '__main__':
     app.run(debug=True)
+
