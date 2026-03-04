@@ -1,45 +1,65 @@
 import streamlit as st
 import sqlite3
 import pandas as pd
+from datetime import date
 
-st.set_page_config(page_title="Family App")
+# -----------------------
+# Database Connection
+# -----------------------
+conn = sqlite3.connect("data.db", check_same_thread=False)
+cursor = conn.cursor()
 
-st.title("👨‍👩‍👧 Family Members")
-
-# -----------------------------
-# Database
-conn = sqlite3.connect("family.db", check_same_thread=False)
-
-conn.execute("""
-CREATE TABLE IF NOT EXISTS family_member(
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS memorization (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT
+    entry_date TEXT,
+    questions INTEGER
 )
 """)
+conn.commit()
 
-# -----------------------------
-# Add member
-st.header("Add Family Member")
+# -----------------------
+# UI
+# -----------------------
+st.title("📘 Daily Memorization Tracker")
 
-name = st.text_input("Enter name")
+today = date.today()
 
-if st.button("Add Member"):
-    if name:
-        conn.execute(
-            "INSERT INTO family_member (name) VALUES (?)",
-            (name,)
-        )
-        conn.commit()
-        st.success("Member added!")
-    else:
-        st.warning("Enter a name")
+st.subheader("Enter Today's Progress")
 
-# -----------------------------
-# Show members
-st.header("Family Members")
+num_questions = st.number_input(
+    "How many questions did you memorize today?",
+    min_value=0,
+    step=1
+)
 
-df = pd.read_sql("SELECT name FROM family_member", conn)
+if st.button("Save Today’s Entry"):
+    cursor.execute(
+        "INSERT INTO memorization (entry_date, questions) VALUES (?, ?)",
+        (str(today), num_questions)
+    )
+    conn.commit()
+    st.success("Saved successfully!")
 
-st.dataframe(df)
+# -----------------------
+# Show All Data
+# -----------------------
+st.subheader("📅 All Entries")
 
-conn.close()
+df = pd.read_sql("SELECT * FROM memorization", conn)
+
+if not df.empty:
+    st.dataframe(df)
+
+# -----------------------
+# Weekly Report
+# -----------------------
+st.subheader("📊 Weekly Report")
+
+if not df.empty:
+    df["entry_date"] = pd.to_datetime(df["entry_date"])
+    df["week"] = df["entry_date"].dt.isocalendar().week
+
+    weekly = df.groupby("week")["questions"].sum().reset_index()
+
+    st.bar_chart(weekly.set_index("week"))
